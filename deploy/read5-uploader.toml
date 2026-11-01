@@ -1,0 +1,62 @@
+# read5-uploader on a Raspberry Pi beside rtl_airband.
+# Installed as /etc/read5/read5-uploader.toml. The upload key goes in
+# /etc/read5/read5.env as READ5_UPLOAD_KEY=r5_<receiver>.<secret>, not here.
+#
+# After editing, check it with:  read5-uploader check
+# then restart:                  sudo systemctl restart read5-uploader
+
+[receiver]
+# The receiver id is taken from the upload key; set it here only to check it.
+# id = "3"
+# Published in the receiver document (receivers/<id>.json). Leave lat/lon
+# out unless you want your receiver's position public; a suburb is plenty.
+name = "my-receiver"
+# lat = -31.95
+# lon = 115.86
+# location = "Perth"
+
+[rtl_airband]
+# Ports, frequencies and labels come from rtl_airband's own config: every
+# channel output `{ type = "udp_stream"; dest_address = "127.0.0.1";
+# dest_port = <unique>; continuous = true; }` whose frequency has a
+# [[channels]] entry below is recorded. See what will be picked up with:
+#   read5-uploader streams
+config = '/usr/local/etc/rtl_airband.conf'
+listen = "127.0.0.1"
+# latency_ms = 12.5
+# split_gap_ms = 300
+# min_ms = 150
+# max_ms = 120000
+# down_after_secs = 5
+require_ntp = true
+
+# If rtl_airband.conf can't be read (Docker, another host), list the streams:
+# [[rtl_airband.streams]]
+# port = 6101
+# khz = 118100
+# label = "Jandakot Tower"
+
+# One per frequency. The id is the channel id Read5 issued with your key; the
+# key may only upload to the channels it was issued for.
+[[channels]]
+khz = 118100
+id = "ypjt-twr-118100"
+label = "Jandakot Tower"
+
+[upload]
+url = 'https://read5.net/api/ingest'
+
+[spool]
+dir = '/var/lib/read5/spool'
+# Stop taking new audio once this many minutes are waiting to upload (3 days).
+max_backlog_minutes = 4320
+
+[encode]
+bitrate_kbps = 12
+
+# A second, levelled copy of every utterance, so all receivers sound alike.
+[process]
+enabled = true
+
+[run]
+status_file = '/var/lib/read5/status.json'

@@ -1,0 +1,32 @@
+[Unit]
+Description=Read5 uploader (rtl_airband UDP audio to Read5)
+Documentation=https://github.com/jimvella/read5-uploader
+Wants=network-online.target time-sync.target
+After=network-online.target time-sync.target
+# Never stop restarting after repeated failures.
+StartLimitIntervalSec=0
+
+[Service]
+Type=notify
+ExecStart=/opt/read5/read5-uploader run --config /etc/read5/read5-uploader.toml
+EnvironmentFile=-/etc/read5/read5.env
+WorkingDirectory=/var/lib/read5
+Restart=always
+RestartSec=5
+# The uploader sends WATCHDOG=1 every couple of seconds while every receive
+# thread is alive; a hung process is killed and restarted, not only a crashed one.
+WatchdogSec=60
+# SIGINT and SIGTERM are both a clean stop: write open utterances, seal, upload.
+KillSignal=SIGINT
+TimeoutStopSec=45
+User=read5
+Group=read5
+StateDirectory=read5
+NoNewPrivileges=true
+ProtectSystem=strict
+# Read-only rather than hidden: some setups keep rtl_airband.conf under /home.
+ProtectHome=read-only
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

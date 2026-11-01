@@ -1,0 +1,12 @@
+# audiopus_sys vendors a libopus whose CMakeLists predates CMake 3.5; CMake 4
+# refuses it without this.
+[env]
+CMAKE_POLICY_VERSION_MINIMUM = "3.5"
+# Build the bundled libopus and link it statically, so the binary needs no
+# system libopus.
+OPUS_STATIC = "1"
+OPUS_NO_PKG = "1"
+# libopus's NEON code needs NEON enabled when cross-compiling for armv7. Every
+# armv7 Pi (2, 3, 4 on a 32-bit OS) has a Cortex-A7 or later. This is zig's
+# spelling (`cargo zigbuild`); zig ignores -mfpu.
+CFLAGS_armv7_unknown_linux_gnueabihf = "-mcpu=cortex_a7"
