@@ -99,7 +99,9 @@ fn print_streams(cfg: &Config) -> Result<()> {
 fn init_logging(log_dir: Option<PathBuf>) -> Option<tracing_appender::non_blocking::WorkerGuard> {
     use tracing_subscriber::{fmt, prelude::*, EnvFilter};
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    let stderr = fmt::layer().with_writer(std::io::stderr).with_target(false);
+    // Colour only on a terminal: under systemd stderr goes to the journal.
+    let ansi = std::io::IsTerminal::is_terminal(&std::io::stderr());
+    let stderr = fmt::layer().with_writer(std::io::stderr).with_ansi(ansi).with_target(false);
     match log_dir {
         Some(dir) => {
             let _ = std::fs::create_dir_all(&dir);
