@@ -72,6 +72,88 @@ Then:
 
 To upgrade, run `install.sh` from a newer bundle. It keeps `/etc/read5`.
 
+## Example: one channel
+
+A working setup from a Read5 test receiver: a Pi 4 with an RTL-SDR dongle,
+recording Perth Clearance Delivery on 118.55 MHz.
+
+`/usr/local/etc/rtl_airband.conf`:
+
+```
+devices: (
+  {
+    type = "rtlsdr";
+    index = 0;
+    gain = 32.8;
+    centerfreq = 118.75;     # off the channel, so the tuner's DC spike isn't on it
+    correction = 0;
+    channels: (
+      {
+        freq = 118.55;
+        label = "Perth Clearance Delivery";
+        bandwidth = 10000;   # 10 kHz audio filter
+        outputs: (
+          { type = "udp_stream"; dest_address = "127.0.0.1"; dest_port = 6101; continuous = true; }
+        );
+      }
+    );
+  }
+);
+```
+
+`/etc/read5/read5-uploader.toml`:
+
+```toml
+[receiver]
+name = "perth-pi-airband"
+
+[rtl_airband]
+config = '/usr/local/etc/rtl_airband.conf'
+listen = "127.0.0.1"
+require_ntp = true
+
+[[channels]]
+khz = 118550
+id = "ypph-acd-118550"
+label = "Perth Clearance Delivery"
+
+[upload]
+url = 'https://read5.net/api/ingest'
+
+[spool]
+dir = '/var/lib/read5/spool'
+max_backlog_minutes = 4320
+
+[encode]
+bitrate_kbps = 12
+
+[process]
+enabled = true
+
+[run]
+status_file = '/var/lib/read5/status.json'
+```
+
+`/etc/read5/read5.env` (mode 600, owned by root):
+
+```
+READ5_UPLOAD_KEY=r5_<receiver>.<secret>
+```
+
+`read5-uploader check` then prints:
+
+```
+config:   /etc/read5/read5-uploader.toml (ok)
+receiver: 3
+spool:    /var/lib/read5/spool
+port  6101  118550 kHz  ypph-acd-118550           Perth Clearance Delivery
+upload:   https://read5.net/api/ingest accepts the key
+```
+
+For more channels, add a channel to rtl_airband with its own `dest_port`
+(6102, 6103, ...), and a `[[channels]]` entry here for its frequency. One
+RTL-SDR dongle covers about 2.5 MHz around its `centerfreq`.
+
 ## Running
 
 | | |
