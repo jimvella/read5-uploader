@@ -85,8 +85,18 @@ and uploads it. If you already run docker-rtlsdrairband, it takes that
 image's place and everything you have set up keeps working; without an
 upload key it behaves exactly as docker-rtlsdrairband does.
 
-It is published for 64-bit Raspberry Pi OS (arm64). For another
-architecture, build it with `scripts/docker.sh` (see Building).
+It is published for 64-bit Raspberry Pi OS (arm64). On another
+architecture, or to build it yourself from this source, give Compose the
+repository in place of the `image:` line below:
+
+```yaml
+    build:
+      context: https://github.com/jimvella/read5-uploader.git#main
+      dockerfile: docker/rtlsdrairband/Dockerfile
+```
+
+`docker compose build` then compiles the uploader and rtl_airband on your
+machine: about ten minutes on a Pi 4, once. Run it again to upgrade.
 
 You need Docker with the Compose plugin, an RTL-SDR dongle, and an upload
 key and channel ids from Read5. The host must not load the DVB driver for
@@ -317,7 +327,9 @@ The Pi bundles are cross-compiled from Linux with
 [cargo-zigbuild](https://github.com/rust-cross/cargo-zigbuild):
 `bash scripts/package.sh` writes them, with SHA-256 sums, to `dist/`.
 `bash scripts/docker.sh` builds the two Docker images from the same
-cross-compiled binary (`PUSH=1` for all three architectures, pushed).
+cross-compiled binary (`PUSH=1` for all three architectures, pushed). Built
+without it, as `docker build` or Compose do from the repository alone, the
+Dockerfiles compile the uploader themselves.
 After changing dependencies, regenerate the licence list with
 `cargo about generate about.hbs -o THIRD_PARTY_LICENSES.md`
 ([cargo-about](https://github.com/EmbarkStudios/cargo-about)).

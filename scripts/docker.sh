@@ -20,7 +20,8 @@
 # and no Rust there: here, `STAGE_ONLY=1 ARCHES=arm64 bash scripts/docker.sh`
 # only cross-compiles into dist/docker/; copy the repository (dist/ included)
 # to the Pi and run `bash scripts/docker.sh` there, where, with no cargo, it
-# uses the staged binary.
+# uses the staged binary. With neither cargo nor a staged binary, the image
+# build compiles the uploader itself (slow on a Pi, but needs nothing else).
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -54,8 +55,7 @@ for arch in $ARCHES; do
     mkdir -p "$ROOT/dist/docker/$arch"
     cp "$TARGET/$triple/release/read5-uploader" "$ROOT/dist/docker/$arch/"
   elif [ ! -f "$ROOT/dist/docker/$arch/read5-uploader" ]; then
-    echo "no cargo here and no dist/docker/$arch/read5-uploader: stage it elsewhere with STAGE_ONLY=1" >&2
-    exit 1
+    echo "no cargo here and no dist/docker/$arch/read5-uploader: the image build will compile it" >&2
   fi
   platforms=${platforms:+$platforms,}$platform
 done

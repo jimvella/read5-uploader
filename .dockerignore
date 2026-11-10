@@ -1,7 +1,14 @@
-# The images only take the cross-compiled binaries, the licences and the
-# service files; keep everything else (target/ above all) out of the context.
+# What the images are built from: the source (or the binaries
+# scripts/docker.sh cross-compiled into dist/docker/), the licences and the
+# service files. target/ above all stays out of the context.
 *
+!Cargo.toml
+!Cargo.lock
+!.cargo
+!src
+!deploy
+!docker
+!tests
 !dist/docker
 !LICENSE
 !THIRD_PARTY_LICENSES.md
-!docker/rtlsdrairband/rootfs
