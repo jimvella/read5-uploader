@@ -1,0 +1,31 @@
+# read5-uploader inside the rtlsdrairband-read5 container. It sits beside
+# rtl_airband.conf in the folder mounted at /run/rtlsdr-airband. The upload
+# key is the READ5_UPLOAD_KEY environment variable, not here.
+#
+# After editing, restart the container. To check it first:
+#   docker exec rtlsdrairband read5-uploader check -c /run/rtlsdr-airband/read5-uploader.toml
+
+[receiver]
+# Published in the receiver document. Leave lat/lon out unless you want your
+# receiver's position public; a suburb is plenty.
+name = "my-receiver"
+# lat = -31.95
+# lon = 115.86
+# location = "Perth"
+
+[rtl_airband]
+# Ports, frequencies and labels are read from rtl_airband's config: every
+# udp_stream output whose frequency has a [[channels]] entry below.
+config = '/run/rtlsdr-airband/rtl_airband.conf'
+
+# One per frequency, with the channel id Read5 issued with your key.
+[[channels]]
+khz = 118550
+id = "ypph-acd-118550"
+label = "Perth Clearance Delivery"
+
+[spool]
+dir = '/var/lib/read5/spool'
+
+[run]
+status_file = '/var/lib/read5/status.json'

@@ -1,0 +1,21 @@
+#!/command/with-contenv bash
+# shellcheck shell=bash
+# The Read5 uploader as one more service beside rtl_airband. Without an upload
+# key the image behaves exactly as docker-rtlsdrairband does.
+
+CONFIG="${READ5_CONFIG:-/run/rtlsdr-airband/read5-uploader.toml}"
+
+if [ -z "${READ5_UPLOAD_KEY}" ]; then
+	echo "[read5-uploader] READ5_UPLOAD_KEY is not set: not uploading to Read5"
+	exec sleep 86400
+fi
+
+if [ ! -f "$CONFIG" ]; then
+	echo "[read5-uploader] $CONFIG not found. Put read5-uploader.toml beside rtl_airband.conf in the folder mounted at /run/rtlsdr-airband (or set READ5_CONFIG). Trying again in a minute."
+	exec sleep 60
+fi
+
+# exec, not a pipe through awk as the other services do: the stop signal must
+# reach the uploader itself, so it writes its open utterances before exiting.
+# Its log lines carry their own timestamps.
+exec /usr/local/bin/read5-uploader run --config "$CONFIG" 2>&1

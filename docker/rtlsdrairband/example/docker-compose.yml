@@ -1,0 +1,28 @@
+# docker-rtlsdrairband with the Read5 uploader. If you already run
+# docker-rtlsdrairband, the changes to your service are the image, the
+# READ5_UPLOAD_KEY variable and the read5 volume; the rest stays as you have it.
+services:
+  rtlsdrairband:
+    image: ghcr.io/jimvella/rtlsdrairband-read5:latest
+    container_name: rtlsdrairband
+    restart: unless-stopped
+    # On stop the uploader writes the transmission in progress and tries to
+    # upload the last minute; anything left waits in the read5 volume.
+    stop_grace_period: 30s
+    device_cgroup_rules:
+      - "c 189:* rwm"
+    ports:
+      - 8000:8000 # Icecast, if you use it
+    environment:
+      # Read5 needs your own rtl_airband.conf: the frequency variables
+      # (RTLSDRAIRBAND_FREQS and so on) only produce an Icecast output.
+      - RTLSDRAIRBAND_CUSTOMCONFIG=true
+      # The upload key Read5 issued for your receiver. Better in a .env file
+      # beside this one (READ5_UPLOAD_KEY=r5_...) than written here.
+      - READ5_UPLOAD_KEY=${READ5_UPLOAD_KEY}
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb:ro
+      # rtl_airband.conf and read5-uploader.toml
+      - ./config:/run/rtlsdr-airband
+      # audio waiting to be uploaded, and status.json
+      - ./read5:/var/lib/read5

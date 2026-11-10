@@ -73,6 +73,57 @@ Then:
 
 To upgrade, run `install.sh` from a newer bundle. It keeps `/etc/read5`.
 
+## Install with Docker
+
+If you run rtl_airband from the
+[docker-rtlsdrairband](https://github.com/sdr-enthusiasts/docker-rtlsdrairband)
+image, use `ghcr.io/jimvella/rtlsdrairband-read5` in its place. It is that
+image with this program added as one more service
+([`docker/rtlsdrairband/Dockerfile`](docker/rtlsdrairband/Dockerfile)), and
+with rtl_airband rebuilt for 16 kHz audio. Without an upload key it behaves
+as docker-rtlsdrairband does.
+
+[`docker/rtlsdrairband/example/`](docker/rtlsdrairband/example) is a
+complete setup: `docker-compose.yml` and a `config` folder. In short:
+
+1. Change the image, and add the key and a volume for audio waiting to
+   upload:
+
+   ```yaml
+   image: ghcr.io/jimvella/rtlsdrairband-read5:latest
+   stop_grace_period: 30s
+   environment:
+     - RTLSDRAIRBAND_CUSTOMCONFIG=true
+     - READ5_UPLOAD_KEY=${READ5_UPLOAD_KEY}    # in a .env file beside the compose file
+   volumes:
+     - ./config:/run/rtlsdr-airband
+     - ./read5:/var/lib/read5
+   ```
+
+   Read5 needs your own `rtl_airband.conf` (`RTLSDRAIRBAND_CUSTOMCONFIG`):
+   the image's frequency variables only produce an Icecast output.
+2. In `config/rtl_airband.conf`, add a `udp_stream` output to each channel,
+   as in step 1 of the Pi install above.
+3. Put `read5-uploader.toml` in the same `config` folder, with a
+   `[[channels]]` entry for each frequency.
+4. `docker compose up -d`, then check it, including that Read5 accepts the
+   key:
+
+   ```
+   docker exec rtlsdrairband read5-uploader check -c /run/rtlsdr-airband/read5-uploader.toml
+   ```
+
+Logs are in `docker logs rtlsdrairband`, the status file is
+`read5/status.json`, and the container's health check fails if the uploader
+stops or hangs.
+
+With any other rtl_airband, `ghcr.io/jimvella/read5-uploader` is this
+program alone. Mount the config at `/etc/read5/read5-uploader.toml` and a
+volume at `/var/lib/read5`, set `READ5_UPLOAD_KEY`, and make sure
+rtl_airband's datagrams reach it: `network_mode: host` on both containers is
+the simplest way. If it can't read `rtl_airband.conf`, list the streams in
+`[[rtl_airband.streams]]`.
+
 ## Example: one channel
 
 A working setup from a Read5 test receiver: a Pi 4 with an RTL-SDR dongle,
@@ -189,6 +240,8 @@ cargo test
 The Pi bundles are cross-compiled from Linux with
 [cargo-zigbuild](https://github.com/rust-cross/cargo-zigbuild):
 `bash scripts/package.sh` writes them, with SHA-256 sums, to `dist/`.
+`bash scripts/docker.sh` builds the two Docker images from the same
+cross-compiled binary (`PUSH=1` for all three architectures, pushed).
 After changing dependencies, regenerate the licence list with
 `cargo about generate about.hbs -o THIRD_PARTY_LICENSES.md`
 ([cargo-about](https://github.com/EmbarkStudios/cargo-about)).

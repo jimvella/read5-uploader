@@ -224,4 +224,17 @@ mixers: {
         let f = find(&v);
         assert!(f.streams.is_empty() && f.skipped.is_empty());
     }
+
+    #[test]
+    fn the_docker_example_pair_agrees() {
+        let conf = include_str!("../../docker/rtlsdrairband/example/config/rtl_airband.conf");
+        let f = find(&parse(conf).unwrap());
+        assert!(f.skipped.is_empty(), "{:#?}", f.skipped.iter().map(|s| &s.reason).collect::<Vec<_>>());
+        let got: Vec<(u16, u32)> = f.streams.iter().map(|s| (s.port, s.khz())).collect();
+        assert_eq!(got, vec![(6101, 118550)]);
+        let toml = include_str!("../../docker/rtlsdrairband/example/config/read5-uploader.toml");
+        let cfg = crate::config::Config::parse(toml).unwrap();
+        assert!(cfg.channel_for_khz(118550).is_some());
+        assert!(cfg.run.status_file.is_some(), "the image's health check reads it");
+    }
 }

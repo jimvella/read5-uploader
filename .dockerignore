@@ -1,0 +1,7 @@
+# The images only take the cross-compiled binaries, the licences and the
+# service files; keep everything else (target/ above all) out of the context.
+*
+!dist/docker
+!LICENSE
+!THIRD_PARTY_LICENSES.md
+!docker/rtlsdrairband/rootfs
