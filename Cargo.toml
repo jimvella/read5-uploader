@@ -31,6 +31,7 @@ socket2 = "0.5"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 nix = { version = "0.29", features = ["socket", "uio", "time"] }
+libc = "0.2"
 
 [target.'cfg(unix)'.dependencies]
 sd-notify = "0.4"

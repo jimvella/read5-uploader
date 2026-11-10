@@ -203,8 +203,8 @@ impl Airband {
         self.require_ntp && self.clock_synced() == Some(false)
     }
 
-    /// `timedatectl`'s view, refreshed once a minute. `None` where it can't be
-    /// asked (not systemd, not Linux): then nothing is held.
+    /// The kernel's view, refreshed once a minute. `None` where it can't be
+    /// asked (not Linux): then nothing is held.
     pub fn clock_synced(&self) -> Option<bool> {
         let mut g = self.ntp.lock().unwrap();
         let now = now_ms();
@@ -229,6 +229,7 @@ impl Airband {
         serde_json::json!({
             "clockSynced": self.clock_synced(),
             "holdingUploads": self.hold_uploads(),
+            "threadsAlive": self.threads_alive(),
             "streams": streams,
         })
     }
@@ -246,15 +247,17 @@ impl Drop for Airband {
 
 #[cfg(target_os = "linux")]
 fn ntp_synchronized() -> Option<bool> {
-    let out = std::process::Command::new("timedatectl")
-        .args(["show", "-p", "NTPSynchronized", "--value"])
-        .output()
-        .ok()?;
-    match String::from_utf8_lossy(&out.stdout).trim() {
-        "yes" => Some(true),
-        "no" => Some(false),
-        _ => None,
+    // What `timedatectl show -p NTPSynchronized` reports (systemd's
+    // `ntp_synced`): the kernel's maximum clock error is under its 16 s
+    // ceiling, where only a running NTP client keeps it. Asked of the kernel
+    // directly, so it also works in a container and without systemd. Reading
+    // (`modes` = 0) needs no privilege.
+    let mut tx: libc::timex = unsafe { std::mem::zeroed() };
+    if unsafe { libc::adjtimex(&mut tx) } < 0 {
+        return None;
     }
+    #[allow(clippy::unnecessary_cast)] // c_long is 32-bit on armv7
+    Some((tx.maxerror as i64) < 16_000_000)
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -474,5 +477,15 @@ mod recv {
             Ok(n) => Some((n, now_us())),
             Err(_) => None,
         }
+    }
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod tests {
+    #[test]
+    fn the_kernel_answers_the_clock_question() {
+        let synced = super::ntp_synchronized();
+        println!("ntp_synchronized: {synced:?}");
+        assert!(synced.is_some());
     }
 }

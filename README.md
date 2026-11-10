@@ -28,8 +28,9 @@ It sends nothing else: no system details, no other files, nothing from
 rtl_airband beyond the audio of the channels in `[[channels]]`. It
 receives on the UDP ports in your rtl_airband config, on the address in
 `[rtl_airband] listen` (`127.0.0.1` by default), and listens on no other
-port. The only thing it runs is `timedatectl show -p NTPSynchronized` once a
-minute, to hold uploads while the clock is wrong.
+port. It runs no other program. Once a minute it asks the kernel whether
+the clock is NTP-synchronised (what `timedatectl` shows), to hold uploads
+while the clock is wrong.
 
 The key lets the receiver write only its own objects, and channel archives
 only for the channels it was issued. It can't read or change anyone else's
@@ -160,6 +161,7 @@ RTL-SDR dongle covers about 2.5 MHz around its `centerfreq`.
 |---|---|
 | Logs | `journalctl -u read5-uploader -f` |
 | Status | `/var/lib/read5/status.json`: uploads waiting, and per stream whether it's up, its clock drift and jitter, and lost batches |
+| Health | `read5-uploader health` exits 0 while the uploader is running and 1 if it has stopped or hung (by the age of the status file). systemd's watchdog does this for the service; it is for a Docker `HEALTHCHECK` |
 | Spool | `/var/lib/read5/spool`: audio waiting to be sealed or uploaded |
 | Restart | `sudo systemctl restart read5-uploader` (needed after editing the config) |
 

@@ -1041,6 +1041,7 @@ dependencies = [
  "chrono",
  "clap",
  "ebur128",
+ "libc",
  "md-5",
  "nix",
  "ogg",

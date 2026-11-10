@@ -1,6 +1,7 @@
 mod airband;
 mod audio;
 mod config;
+mod health;
 mod ingest;
 mod input;
 mod manifest;
@@ -11,7 +12,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use tracing::{error, info, warn};
 
@@ -53,6 +54,13 @@ enum Cmd {
         #[arg(long, short, default_value = DEFAULT_CONFIG)]
         config: PathBuf,
     },
+    /// Exit 0 if a running uploader is alive, by its status file
+    /// (`run.status_file`), and 1 if it is stopped or hung. For a Docker
+    /// HEALTHCHECK, where there is no systemd watchdog.
+    Health {
+        #[arg(long, short, default_value = DEFAULT_CONFIG)]
+        config: PathBuf,
+    },
 }
 
 fn main() -> Result<()> {
@@ -78,6 +86,17 @@ fn main() -> Result<()> {
             let store = ingest::Ingest::new(&cfg.upload.url, &cfg.upload.key);
             rt.block_on(store.check_key())?;
             println!("upload:   {} accepts the key", store.url());
+            Ok(())
+        }
+        Cmd::Health { config } => {
+            let cfg = Config::load_offline(&config)?;
+            let Some(path) = cfg.run.status_file else {
+                anyhow::bail!("run.status_file is not set in {}; `health` reads it", config.display());
+            };
+            let text = std::fs::read(&path).with_context(|| format!("read {}", path.display()))?;
+            let status = serde_json::from_slice(&text).with_context(|| format!("parse {}", path.display()))?;
+            health::check(&status, now_ms(), health::max_age_ms(cfg.run.status_secs)).map_err(anyhow::Error::msg)?;
+            println!("ok");
             Ok(())
         }
         Cmd::Run { config } => {
