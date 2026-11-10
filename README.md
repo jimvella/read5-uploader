@@ -4,7 +4,8 @@ Contributes air-band audio from your receiver to [Read5](https://read5.net).
 It records the channels [rtl_airband](https://github.com/rtl-airband/RTLSDR-Airband)
 sends to a local UDP port, splits them into transmissions, encodes them as
 Opus and uploads one archive per channel per minute. It runs as a single
-program beside rtl_airband, typically on a Raspberry Pi.
+program beside rtl_airband, typically on a Raspberry Pi, installed either
+as a service or with Docker Compose.
 
 The source is public so you can see exactly what it does with your audio
 and your connection before you run it.
@@ -73,56 +74,131 @@ Then:
 
 To upgrade, run `install.sh` from a newer bundle. It keeps `/etc/read5`.
 
-## Install with Docker
+## Install with Docker Compose
 
-If you run rtl_airband from the
+`ghcr.io/jimvella/rtlsdrairband-read5` is the
 [docker-rtlsdrairband](https://github.com/sdr-enthusiasts/docker-rtlsdrairband)
-image, use `ghcr.io/jimvella/rtlsdrairband-read5` in its place. It is that
 image with this program added as one more service
 ([`docker/rtlsdrairband/Dockerfile`](docker/rtlsdrairband/Dockerfile)), and
-with rtl_airband rebuilt for 16 kHz audio. Without an upload key it behaves
-as docker-rtlsdrairband does.
+with rtl_airband rebuilt for 16 kHz audio. One container receives the audio
+and uploads it. If you already run docker-rtlsdrairband, it takes that
+image's place and everything you have set up keeps working; without an
+upload key it behaves exactly as docker-rtlsdrairband does.
 
-[`docker/rtlsdrairband/example/`](docker/rtlsdrairband/example) is a
-complete setup: `docker-compose.yml` and a `config` folder. In short:
+It is published for 64-bit Raspberry Pi OS (arm64). For another
+architecture, build it with `scripts/docker.sh` (see Building).
 
-1. Change the image, and add the key and a volume for audio waiting to
-   upload:
+You need Docker with the Compose plugin, an RTL-SDR dongle, and an upload
+key and channel ids from Read5. The host must not load the DVB driver for
+the dongle (`echo blacklist dvb_usb_rtl28xxu | sudo tee
+/etc/modprobe.d/blacklist-rtl.conf`, then reboot).
+
+1. Make a folder with these files (they are in
+   [`docker/rtlsdrairband/example/`](docker/rtlsdrairband/example)):
+
+   ```
+   airband/
+     docker-compose.yml
+     .env                       READ5_UPLOAD_KEY=r5_<receiver>.<secret>
+     config/
+       rtl_airband.conf
+       read5-uploader.toml
+   ```
+
+2. `docker-compose.yml`:
 
    ```yaml
-   image: ghcr.io/jimvella/rtlsdrairband-read5:latest
-   stop_grace_period: 30s
-   environment:
-     - RTLSDRAIRBAND_CUSTOMCONFIG=true
-     - READ5_UPLOAD_KEY=${READ5_UPLOAD_KEY}    # in a .env file beside the compose file
-   volumes:
-     - ./config:/run/rtlsdr-airband
-     - ./read5:/var/lib/read5
+   services:
+     rtlsdrairband:
+       image: ghcr.io/jimvella/rtlsdrairband-read5:latest
+       container_name: rtlsdrairband
+       restart: unless-stopped
+       stop_grace_period: 30s
+       device_cgroup_rules:
+         - "c 189:* rwm"
+       ports:
+         - 8000:8000                  # Icecast, if you use it
+       environment:
+         - RTLSDRAIRBAND_CUSTOMCONFIG=true
+         - READ5_UPLOAD_KEY=${READ5_UPLOAD_KEY}
+       volumes:
+         - /dev/bus/usb:/dev/bus/usb:ro
+         - ./config:/run/rtlsdr-airband     # rtl_airband.conf, read5-uploader.toml
+         - ./read5:/var/lib/read5           # audio waiting to upload, status.json
    ```
 
    Read5 needs your own `rtl_airband.conf` (`RTLSDRAIRBAND_CUSTOMCONFIG`):
-   the image's frequency variables only produce an Icecast output.
-2. In `config/rtl_airband.conf`, add a `udp_stream` output to each channel,
-   as in step 1 of the Pi install above.
-3. Put `read5-uploader.toml` in the same `config` folder, with a
-   `[[channels]]` entry for each frequency.
-4. `docker compose up -d`, then check it, including that Read5 accepts the
-   key:
+   the image's frequency variables (`RTLSDRAIRBAND_FREQS` and so on) only
+   produce an Icecast output. If you only feed Read5, leave the Icecast
+   output out of `rtl_airband.conf`, add `- ICECAST_DISABLE=true` and drop
+   the `ports`.
+
+3. `.env`, readable only by you (`chmod 600 .env`):
 
    ```
+   READ5_UPLOAD_KEY=r5_<receiver>.<secret>
+   ```
+
+4. `config/rtl_airband.conf`: your rtl_airband config, with one extra
+   output on each channel Read5 issued you, each on its own port:
+
+   ```
+   { type = "udp_stream"; dest_address = "127.0.0.1"; dest_port = 6101; continuous = true; }
+   ```
+
+   `continuous = true` is required, and the device must be in
+   `multichannel` mode: channels in scan mode and mixers can't be recorded.
+
+5. `config/read5-uploader.toml`: a `[[channels]]` entry for each of those
+   frequencies, with the channel id Read5 issued:
+
+   ```toml
+   [receiver]
+   name = "my-receiver"
+
+   [rtl_airband]
+   config = '/run/rtlsdr-airband/rtl_airband.conf'
+
+   [[channels]]
+   khz = 118550
+   id = "ypph-acd-118550"
+   label = "Perth Clearance Delivery"
+
+   [spool]
+   dir = '/var/lib/read5/spool'
+
+   [run]
+   status_file = '/var/lib/read5/status.json'
+   ```
+
+6. Start it, then check the config, including that Read5 accepts the key:
+
+   ```
+   docker compose up -d
    docker exec rtlsdrairband read5-uploader check -c /run/rtlsdr-airband/read5-uploader.toml
    ```
 
-Logs are in `docker logs rtlsdrairband`, the status file is
-`read5/status.json`, and the container's health check fails if the uploader
-stops or hangs.
+Day to day:
 
-With any other rtl_airband, `ghcr.io/jimvella/read5-uploader` is this
-program alone. Mount the config at `/etc/read5/read5-uploader.toml` and a
-volume at `/var/lib/read5`, set `READ5_UPLOAD_KEY`, and make sure
-rtl_airband's datagrams reach it: `network_mode: host` on both containers is
-the simplest way. If it can't read `rtl_airband.conf`, list the streams in
-`[[rtl_airband.streams]]`.
+| | |
+|---|---|
+| Logs | `docker compose logs -f` (rtl_airband's lines start `[rtlsdr-airband]`) |
+| Status | `read5/status.json`, as under Running below |
+| Health | `docker ps` shows the container unhealthy if the uploader stops or hangs |
+| After editing either config | `docker compose restart` |
+| Upgrade | `docker compose pull && docker compose up -d` |
+
+Audio recorded while the network or Read5 is unreachable waits in the
+`read5` folder and uploads later, across restarts and upgrades. Only one
+uploader may run per upload key: stop a `read5-uploader` service on the same
+machine before starting the container with its key.
+
+With an rtl_airband that isn't docker-rtlsdrairband,
+`ghcr.io/jimvella/read5-uploader` is this program alone. Mount the config
+at `/etc/read5/read5-uploader.toml` and a volume at `/var/lib/read5`, set
+`READ5_UPLOAD_KEY`, and make sure rtl_airband's datagrams reach it:
+`network_mode: host` on both containers is the simplest way. If it can't
+read `rtl_airband.conf`, list the streams in `[[rtl_airband.streams]]`.
 
 ## Example: one channel
 

@@ -1,6 +1,6 @@
 [package]
 name = "read5-uploader"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license = "MIT"
 description = "Records rtl_airband's UDP audio streams and uploads them to Read5 as per-minute Opus archives"
